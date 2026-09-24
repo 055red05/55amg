@@ -1,0 +1,28 @@
+text = input("Введите текст: ")
+key = int(input("Введите ключ: "))
+
+encrypted = ""
+
+for char in text:
+    if char.isalpha():
+        if char.isupper():
+            encrypted += chr((ord(char) - ord('A') + key) % 26 + ord('A'))
+        else:
+            encrypted += chr((ord(char) - ord('a') + key) % 26 + ord('a'))
+    else:
+        encrypted += char
+
+print("Зашифрованный текст:", encrypted)
+
+decrypted = ""
+
+for char in encrypted:
+    if char.isalpha():
+        if char.isupper():
+            decrypted += chr((ord(char) - ord('A') - key) % 26 + ord('A'))
+        else:
+            decrypted += chr((ord(char) - ord('a') - key) % 26 + ord('a'))
+    else:
+        decrypted += char
+
+print("Расшифрованный текст:", decrypted)
