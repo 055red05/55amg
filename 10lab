@@ -1,0 +1,120 @@
+
+import heapq
+import math
+import json
+from collections import Counter
+from itertools import count
+
+
+def build_huffman(freq):
+    order = count()
+    heap = [(w, next(order), s) for s, w in freq.items() if w > 0]
+
+    if not heap:
+        raise ValueError("Текст пустой")
+
+    heapq.heapify(heap)
+
+    while len(heap) > 1:
+        w1, _, left = heapq.heappop(heap)
+        w2, _, right = heapq.heappop(heap)
+        heapq.heappush(heap, (w1 + w2, next(order), (left, right)))
+
+    tree = heap[0][2]
+    codes = {}
+
+    def walk(node, prefix=""):
+        if isinstance(node, str):
+            codes[node] = prefix or "0"
+        else:
+            walk(node[0], prefix + "0")
+            walk(node[1], prefix + "1")
+
+    walk(tree)
+    return tree, codes
+
+
+text = """
+Теория информации изучает способы хранения, передачи и обработки данных.
+Одной из важных задач является уменьшение объема информации без потери
+содержания. Для этого используются различные методы кодирования.
+Код Хаффмана позволяет назначать короткие двоичные последовательности
+символам, которые встречаются чаще всего, а редким символам назначать
+более длинные последовательности. Благодаря этому средняя длина кода
+может быть меньше длины фиксированного кодирования. Алгоритм строит
+дерево, последовательно объединяя два узла с наименьшими частотами.
+Полученное дерево используется для создания префиксного кода.
+Ни одно кодовое слово такого кода не является началом другого слова,
+поэтому декодирование выполняется однозначно. При исследовании текста
+важно учитывать все символы, включая пробелы, знаки препинания и буквы
+разного регистра. Также необходимо сравнивать не только длину битового
+потока, но и размер исходного файла в выбранной кодировке. Для русского
+текста обычно используется UTF-8, в котором один символ может занимать
+разное количество байтов. При практическом сжатии нужно учитывать
+служебную информацию, необходимую для восстановления таблицы кодов.
+Для коротких сообщений эта информация может оказаться больше экономии.
+Для больших текстов с повторяющимися символами сжатие может быть выгоднее.
+Таким образом, результат зависит от состава текста и способа хранения.
+"""
+
+text = text.strip()
+freq = Counter(text)
+tree, codes = build_huffman(freq)
+
+total = len(text)
+probabilities = {s: n / total for s, n in freq.items()}
+entropy = -sum(p * math.log2(p) for p in probabilities.values())
+
+average_length = sum(
+    probabilities[s] * len(codes[s]) for s in probabilities
+)
+
+efficiency = entropy / average_length * 100
+redundancy = 100 - efficiency
+
+bits = "".join(codes[s] for s in text)
+padding = (8 - len(bits) % 8) % 8
+padded_bits = bits + "0" * padding
+
+packed = bytes(
+    int(padded_bits[i:i + 8], 2)
+    for i in range(0, len(padded_bits), 8)
+)
+
+original_bytes = text.encode("utf-8")
+
+table = json.dumps(
+    codes, ensure_ascii=False, separators=(",", ":")
+).encode("utf-8")
+
+print("Количество символов:", total)
+print("Количество уникальных символов:", len(freq))
+print("Частоты символов:", dict(freq))
+print("Таблица кодов:", codes)
+print("Энтропия:", round(entropy, 4), "бит/символ")
+print("Средняя длина:", round(average_length, 4), "бит/символ")
+print("Эффективность:", round(efficiency, 2), "%")
+print("Избыточность:", round(redundancy, 2), "%")
+print("Длина битового потока:", len(bits), "бит")
+print("Добавлено бит выравнивания:", padding)
+print("Размер исходного текста UTF-8:", len(original_bytes), "байт")
+print("Размер упакованного потока:", len(packed), "байт")
+print("Размер таблицы кодов JSON:", len(table), "байт")
+print(
+    "Размер вместе с таблицей:",
+    len(packed) + len(table),
+    "байт"
+)
+print(
+    "Экономия без таблицы:",
+    round((1 - len(packed) / len(original_bytes)) * 100, 2),
+    "%"
+)
+print(
+    "Экономия с таблицей:",
+    round(
+        (1 - (len(packed) + len(table)) / len(original_bytes)) * 100,
+        2
+    ),
+    "%"
+)
