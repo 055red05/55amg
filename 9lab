@@ -1,0 +1,111 @@
+
+import heapq
+import math
+from collections import Counter
+from itertools import count
+
+
+def build_huffman(freq):
+    if not freq or any(w < 0 for w in freq.values()):
+        raise ValueError("Некорректные частоты")
+
+    order = count()
+    heap = [(w, next(order), s) for s, w in freq.items() if w > 0]
+
+    if not heap:
+        raise ValueError("Все частоты равны нулю")
+
+    heapq.heapify(heap)
+
+    while len(heap) > 1:
+        w1, _, left = heapq.heappop(heap)
+        w2, _, right = heapq.heappop(heap)
+        heapq.heappush(heap, (w1 + w2, next(order), (left, right)))
+
+    tree = heap[0][2]
+    codes = {}
+
+    def walk(node, prefix=""):
+        if isinstance(node, str):
+            codes[node] = prefix or "0"
+        else:
+            walk(node[0], prefix + "0")
+            walk(node[1], prefix + "1")
+
+    walk(tree)
+    return tree, codes
+
+
+def encode(text, codes):
+    try:
+        return "".join(codes[s] for s in text)
+    except KeyError as error:
+        raise ValueError(f"Нет кода для символа: {error.args[0]}")
+
+
+def decode(bits, tree):
+    if isinstance(tree, str):
+        if any(bit != "0" for bit in bits):
+            raise ValueError("Некорректный битовый поток")
+        return tree * len(bits)
+
+    result = []
+    node = tree
+
+    for bit in bits:
+        if bit not in "01":
+            raise ValueError("Допустимы только 0 и 1")
+
+        node = node[int(bit)]
+
+        if isinstance(node, str):
+            result.append(node)
+            node = tree
+
+    if node is not tree:
+        raise ValueError("Неполное кодовое слово")
+
+    return "".join(result)
+
+
+def calculate_metrics(freq, codes):
+    total = sum(freq.values())
+    probabilities = {s: w / total for s, w in freq.items() if w > 0}
+
+    average_length = sum(
+        probabilities[s] * len(codes[s]) for s in probabilities
+    )
+
+    entropy = -sum(
+        p * math.log2(p) for p in probabilities.values()
+    )
+
+    efficiency = entropy / average_length * 100
+    redundancy = 100 - efficiency
+
+    return entropy, average_length, efficiency, redundancy
+
+
+text = "ABCADE"
+freq = Counter(text)
+
+tree, codes = build_huffman(freq)
+bits = encode(text, codes)
+decoded = decode(bits, tree)
+
+entropy, average_length, efficiency, redundancy = calculate_metrics(
+    freq, codes
+)
+
+print("Частоты:", dict(freq))
+print("Коды:", codes)
+print("Закодированная строка:", bits)
+print("Длина потока:", len(bits), "бит")
+print("Декодированное сообщение:", decoded)
+print("Энтропия:", round(entropy, 4))
+print("Средняя длина:", round(average_length, 4))
+print("Эффективность:", round(efficiency, 2), "%")
+print("Избыточность:", round(redundancy, 2), "%")
+
+assert decoded == text
+print("Проверка пройдена: сообщение восстановлено правильно.")
